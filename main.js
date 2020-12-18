@@ -1,4 +1,6 @@
-const canvas = document.getElementById(`game`);
+const canvas = document.getElementById(`game`),
+    canvasWidth = canvas.getAttribute(`width`),
+    canvasHeight = canvas.getAttribute(`height`);
 
 const game = {
     ctx: undefined,
@@ -7,7 +9,7 @@ const game = {
     score: 0,
     blocks: [],
     rows: 1,
-    cols: Math.floor((canvas.getAttribute(`width`) - 40) / 64) - 1,
+    cols: Math.floor((canvasWidth - 120) / 64) - 1,
     indent: 0,
     sprites: {
         background: undefined,
@@ -16,8 +18,8 @@ const game = {
         block: undefined,
     },
     platform: {
-        x: canvas.getAttribute(`width`) / 2 - 52,
-        y: canvas.getAttribute(`height`) - 50,
+        x: canvasWidth / 2 - 52,
+        y: canvasHeight - 50,
         width: 104,
         height: 24,
         velocity: 10,
@@ -30,9 +32,21 @@ const game = {
             }
         },
         move: function() {
-            this.x += this.dx;
-            if(this.ball) {
-                game.ball.x += this.dx;
+            if((this.x > 0 && this.x < canvasWidth - this.width) || (this.x === 0 && this.dx > 0) || (this.x === canvasWidth - this.width && this.dx < 0)){
+                this.x += this.dx;
+                if(this.ball) {
+                    game.ball.x += this.dx;
+                }
+            } else if(this.x < 0){
+                this.x = 0;
+                if(this.ball) {
+                    game.ball.x = this.width / 2 - 11;
+                }
+            } else if(this.x > canvasWidth - this.width){
+                this.x = canvasWidth - this.width;
+                if(this.ball) {
+                    game.ball.x = canvasWidth - this.width / 2 - 11;
+                }
             }
         },
         stop: function() {
@@ -43,9 +57,9 @@ const game = {
         width: 22,
         height: 22,
         frame: 0,
-        x: canvas.getAttribute(`width`) / 2 - 11,
-        y: canvas.getAttribute(`height`) - 72,
-        velocity: 5,
+        x: canvasWidth / 2 - 11,
+        y: canvasHeight - 72,
+        velocity: 8,
         dx: 0,
         dy: 0,
         jump: function() {
@@ -63,43 +77,97 @@ const game = {
             this.y += this.dy;
         },
         collide: function(element) {
-            const x = this.x;
-            const y = this.y;
-            if(x + this.width > element.x &&
-                x < element.x + element.width &&
-                y + this.height > element.y &&
-                y < element.y + element.height) {
-                    return true;
+            const x = this.x + this.dx,
+                y = this.y + this.dy;
+
+            if(x + this.width > element.x && x < element.x + element.width && y + this.height > element.y && y < element.y + element.height) {
+                return true;
             }
         },
-        bumpBlock: function(block) {
-            this.dy *= -1;
+        bumpBlock: function(block, ball) {
+            const blockCenterX = block.x + block.width / 2,
+                blockCenterY = block.y + block.height / 2,
+                ballCenterX = ball.x + ball.dx + ball.width / 2, 
+                ballCenterY = ball.y + ball.dy + ball.height / 2,
+                vectorBlockBallX = ballCenterX - blockCenterX,
+                vectorBlockBallY = ballCenterY - blockCenterY,
+                angleBump = Math.atan2(vectorBlockBallY, vectorBlockBallX) * 180 / Math.PI;
+                
+                if(){
+
+                }
+
             block.isAlive = false;
             game.score++;
             if(game.score >= game.blocks.length) {
                 game.over("You Win!");
             }
         },
-        onTheLeftSide: function(platform) {
-            return (this.x + this.width / 2) < (platform.x + platform.width / 2);
+        getTanDeg: function(deg) {
+            const rad = deg * Math.PI / 180;
+            return Math.tan(rad);
         },
         bumpPlatform: function(platform) {
+            const ballCenter = this.x + this.width / 2,
+                platformCenter = game.platform.x + game.platform.width / 2,
+                isLeftSidePlatform = platformCenter > ballCenter,
+                isCenterPlatform = platformCenter - ballCenter === 0;
+
+            let gradusRelativeToCenter = Math.abs(platformCenter - ballCenter) * 90 / ((game.platform.width + 22) / 2);
+            
+            if(gradusRelativeToCenter > 85) {
+                gradusRelativeToCenter = 85;
+            }
+
             this.dy = -this.velocity;
-            this.dx = this.onTheLeftSide(platform) ? -this.velocity : this.velocity;
+            if(!isCenterPlatform){
+                if(isLeftSidePlatform){
+                    if(gradusRelativeToCenter > 45){
+                        this.dy = this.getTanDeg(90 - gradusRelativeToCenter) * (-this.velocity);
+                        this.dx = -(Math.sqrt(this.velocity**2 - this.dy**2));
+                    } else if(gradusRelativeToCenter < 45){
+                        this.dx = this.getTanDeg(gradusRelativeToCenter) * (-this.velocity);
+                        this.dy = -(Math.sqrt(this.velocity**2 - this.dx**2));
+                    } else if(gradusRelativeToCenter == 45){
+                        this.dx = -(Math.sqrt(this.velocity**2 / 2));
+                        this.dy = -(Math.sqrt(this.velocity**2 / 2));
+                    }
+                } else {
+                    if(gradusRelativeToCenter > 45){
+                        this.dy = this.getTanDeg(90 - gradusRelativeToCenter) * (-this.velocity);
+                        this.dx = Math.sqrt(this.velocity**2 - this.dy**2);
+                    } else if(gradusRelativeToCenter < 45){
+                        this.dx = this.getTanDeg(gradusRelativeToCenter) * (this.velocity);
+                        this.dy = -(Math.sqrt(this.velocity**2 - this.dx**2));
+                    } else if(gradusRelativeToCenter == 45){
+                        this.dx = Math.sqrt(this.velocity**2 / 2);
+                        this.dy = -(Math.sqrt(this.velocity**2 / 2));
+                    }
+                }
+
+                /*this.dy = -(Math.sqrt(this.velocity**2 / 2));
+                this.dx = isLeftSidePlatform ? -(Math.sqrt(this.velocity**2 / 2)) : Math.sqrt(this.velocity**2 / 2);
+                if(gradusRelativeToCenter > 45){
+                    this.dy = this.getTanDeg(90 - gradusRelativeToCenter) * (-this.velocity);
+                    this.dx = isLeftSidePlatform ? -(Math.sqrt(this.velocity**2 - this.dy**2)) : Math.sqrt(this.velocity**2 - this.dy**2);
+                } else if(gradusRelativeToCenter < 45){
+                    const velocity = isLeftSidePlatform ? -this.velocity : this.velocity;
+                    this.dx = this.getTanDeg(gradusRelativeToCenter) * (velocity);
+                    this.dy = -(Math.sqrt(this.velocity**2 - this.dx**2));
+                }*/
+            }
         },
-        checkBounce: function() {
-            const x = this.x + this.dx;
-            const y = this.y + this.dy;
-            if(x < 0) {
-                this.x = 0;
-                this.dx = this.velocity;
-            } else if(x + this.width > canvas.getAttribute(`width`)) {
-                this.x = canvas.getAttribute(`width`) - this.width;
-                this.dx = -this.velocity;
+        bumpEdge: function() {
+            const x = this.x + this.dx,
+                y = this.y + this.dy;
+
+            if((x < 0) || (x + this.width > canvasWidth)) {
+                this.x = x < 0 ? 0 : canvasWidth - this.width;
+                this.dx = -this.dx;
             } else if(y < 0) {
                 this.y = 0;
-                this.dy = this.velocity;
-            } else if(y + this.height > canvas.getAttribute(`height`)){
+                this.dy = -this.dy;
+            } else if(y + this.height > canvasHeight){
                 game.over(`Game Over`);
             }
         }
@@ -127,14 +195,14 @@ const game = {
             this.sprites[image] = new Image();
             this.sprites[image].src = `images/${image}.png`;
         }
-        if(this.cols > 1) this.indent = (canvas.getAttribute(`width`) - 40 - 64 * this.cols) / (this.cols - 1);
+        if(this.cols > 1) this.indent = (canvasWidth - 120 - 64 * this.cols) / (this.cols - 1);
     },
     create: function() {
         for(let row = 0; row < this.rows; row++) {
             for(let col = 0; col < this.cols; col++) {
                 this.blocks.push({
-                    x: (64 + this.indent) * col + 20,
-                    y: (32 + this.indent) * row + 20,
+                    x: (64 + this.indent) * col + 60,
+                    y: (32 + this.indent) * row + 200,
                     width: 64,
                     height: 32,
                     isAlive: true,
@@ -149,7 +217,7 @@ const game = {
         this.run();
     },
     render: function() {
-        this.ctx.clearRect(0, 0, canvas.getAttribute(`width`), canvas.getAttribute(`height`));
+        this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
         this.ctx.drawImage(this.sprites.background, 0, 0);
         this.ctx.drawImage(this.sprites.platform, this.platform.x, this.platform.y);
         this.ctx.drawImage(this.sprites.ball, this.ball.width * this.ball.frame, 0, this.ball.width, this.ball.height, this.ball.x, this.ball.y, this.ball.width, this.ball.height);
@@ -158,7 +226,7 @@ const game = {
                 this.ctx.drawImage(this.sprites.block, item.x, item.y);
             }
         });
-        this.ctx.fillText(`Score - ` + this.score, 15, canvas.getAttribute(`height`) - 15);
+        this.ctx.fillText(`Score - ` + this.score, 15, canvasHeight - 15);
     },
     update: function() {
         if(this.ball.collide(this.platform)){
@@ -173,11 +241,11 @@ const game = {
         this.blocks.forEach(item => {
             if(item.isAlive){
                 if(this.ball.collide(item)){
-                    this.ball.bumpBlock(item);
+                    this.ball.bumpBlock(item, this.ball);
                 }
             }
         });
-        this.ball.checkBounce();
+        this.ball.bumpEdge();
     },
     run: function() {
         this.update();
